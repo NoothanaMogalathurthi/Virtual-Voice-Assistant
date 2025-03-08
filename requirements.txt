@@ -1,0 +1,9 @@
+pyaudio==0.2.14
+dateparser==1.2.1
+schedule==1.2.2
+opencv-python==4.11.0.86
+psutil==7.0.0
+SpeechRecognition==3.14.1
+pywin32==308
+pyautogui==0.9.54
+wikipedia-api==0.8.1
