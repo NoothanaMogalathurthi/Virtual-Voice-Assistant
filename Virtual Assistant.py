@@ -11,6 +11,9 @@ import speech_recognition as sr
 import win32com.client
 import pyautogui
 import wikipedia
+import smtplib
+from email.mime.text import MIMEText
+
 
 speaker = win32com.client.Dispatch("SAPI.SpVoice")
 def takeCommand():
@@ -33,25 +36,27 @@ def takeCommand():
 def set_reminder():
     speaker.Speak("Sure! When do you want me to remind you?")
     print("Sure! When do you want me to remind you?")
-
     reminder_time_phrase = takeCommand().lower()
-
-    # Parse the time phrase into a datetime object
     reminder_datetime = dateparser.parse(reminder_time_phrase)
 
     if reminder_datetime:
-        # Extract hour and minute
-        hour = reminder_datetime.hour
-        minute = reminder_datetime.minute
-
-        # Schedule the reminder
-        schedule.every().day.at(f"{hour:02d}:{minute:02d}").do(remind_user,
-                                                               "Reminder: It's time to...")  # Adjust the reminder message
-        print(f"Reminder scheduled for {hour:02d}:{minute:02d}.")
-        speaker.Speak(f"Reminder scheduled for {hour:02d}:{minute:02d}.")
+        now = datetime.datetime.now()
+        delay = (reminder_datetime - now).total_seconds()
+        if delay > 0:
+            hour = reminder_datetime.hour
+            minute = reminder_datetime.minute
+            print(f"Reminder scheduled for {hour:02d}:{minute:02d}.")
+            speaker.Speak(f"Reminder scheduled for {hour:02d}:{minute:02d}.")
+            schedule.every().day.at(f"{hour:02d}:{minute:02d}").do(remind_user, "Reminder: It's time to...")
+        else:
+            speaker.Speak("The time you specified is in the past. Please try again.")
     else:
-        print("Sorry, I couldn't understand the time. Please try again.")
         speaker.Speak("Sorry, I couldn't understand the time. Please try again.")
+
+def remind_user(reminder_text):
+    speaker.Speak(reminder_text)
+    print(reminder_text)
+
 def remind_user(reminder_text, delay):
     time_format = "%Y-%m-%d %H:%M:%S"
     now = datetime.datetime.now()
@@ -63,40 +68,30 @@ def remind_user(reminder_text, delay):
 
 def send_whatsapp_message(contact_name, message):
     try:
-        # Open the Start menu to switch to WhatsApp
         pyautogui.hotkey("win")
-        time.sleep(1)  # Wait for the Start menu to open
-
-        # Type "WhatsApp" and press Enter to open it
+        time.sleep(2)
         pyautogui.write("WhatsApp")
         pyautogui.press("enter")
-        time.sleep(5)  # Wait for WhatsApp to open
-
-        # Type the contact name in the search bar and press Enter
+        time.sleep(7)
         pyautogui.write(contact_name)
         pyautogui.press("enter")
-        time.sleep(2)  # Wait for the contact to be selected
-
-        # Type the message and press Enter to send
+        time.sleep(3)
         pyautogui.write(message)
         pyautogui.press("enter")
-
         speaker.Speak(f"Message sent to {contact_name}.")
-        print(f"Message sent to {contact_name}.")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        speaker.Speak("Failed to send WhatsApp message.")
+        print(f"Error: {e}")
 
 
 def open_application(application_name):
     try:
-        # Try to open the application using the default system command
         subprocess.Popen(application_name, shell=True)
     except Exception as e:
         print(f"Error: {e}")
 
 
 def open_camera():
-    # Open the default camera (camera index 0)
     cap = cv2.VideoCapture(0)
 
     if not cap.isOpened():
@@ -120,19 +115,36 @@ def open_camera():
     # Close all OpenCV windows
     cv2.destroyAllWindows()
 
+def send_email_jarvis(recipient, subject, body):
+    try:
+        sender = "your_email@gmail.com"
+        password = "your_password"
+        msg = MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = sender
+        msg['To'] = recipient
+
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(sender, password)
+            server.send_message(msg)
+        speaker.Speak("Email sent successfully!")
+        print("Email sent successfully!")
+    except Exception as e:
+        speaker.Speak("Failed to send email.")
+        print(f"Error sending email: {e}")
 
 if __name__ == '__main__':
-    try:
-        hour=int(datetime.datetime.now().hour)
-        if hour>=0 and hour<12:
-            speaker.Speak("Good Morning,How Can I help You")
-        elif hour>=12 and hour<18:
-            speaker.Speak("Good Afternoon,How Can I help You")
-        else:
-            speaker.Speak("Good Evening,How Can I help You")
+    hour = int(datetime.datetime.now().hour)
+    if 0 <= hour < 12:
+        speaker.Speak("Good Morning, How Can I help You")
+    elif 12 <= hour < 18:
+        speaker.Speak("Good Afternoon, How Can I help You")
+    else:
+        speaker.Speak("Good Evening, How Can I help You")
 
-
-        while True:
+    while True:
+        try:
             query = takeCommand()
             if "hi " in query.lower():
                 speaker.Speak("Hello..How can I help You?")
@@ -190,8 +202,12 @@ if __name__ == '__main__':
                 send_email_jarvis(recipient, subject, body)
 
             if "open music" in query.lower():
-                musicPath = r"C:\Users\nooth\Downloads\Music.mp3"
-                os.system(f'start explorer "{musicPath}"')
+                speaker.Speak("Please specify the music file path.")
+                music_path = takeCommand()
+                if os.path.exists(music_path):
+                    os.startfile(music_path)
+                else:
+                    speaker.Speak("File not found.")
             if "open camera" in query.lower():
                 open_camera()
             if "open notepad" in query.lower():
@@ -205,12 +221,19 @@ if __name__ == '__main__':
             if "thankyou jarvis" in query.lower():
                 speaker.Speak("Your Welcome!!")
             if "open word" in query.lower():
-                open_application("C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Word.lnk")
+                try:
+                    subprocess.Popen("WINWORD.exe", shell=True)
+                except Exception as e:
+                    speaker.Speak("Could not open Word.")
+                    print(f"Error: {e}")
             if "open excel" in query.lower():
                 open_application("C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Excel.lnk")
             if "open powerpoint" in query.lower():
                 open_application("C:\ProgramData\Microsoft\Windows\Start Menu\Programs\PowerPoint.lnk")
             schedule.run_pending()
             time.sleep(1)
-    except Exception as e:
-        print(f"An error occurred: {e}")
+            schedule.run_pending()
+            time.sleep(1)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            speaker.Speak("An error occurred. Please try again.")
